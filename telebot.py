@@ -26,6 +26,15 @@ message_engine.setRate_(speaking_rate)
 # Define an asynchronous message handler function
 @client.on(events.NewMessage)
 async def handle_message(event):
+    global selected_chat_name
+
+    # Get the chat entity of the incoming message
+    message_chat = await event.client.get_entity(event.chat_id)
+
+    # Ignore messages from other chats
+    if message_chat.title != selected_chat_name:
+        return
+
     # Ignore messages with no text or with URLs, stickers, or media
     if not event.message.text or event.message.sticker or event.message.media or re.search("(?P<url>https?://[^\s]+)", event.message.text):
         return
@@ -35,8 +44,8 @@ async def handle_message(event):
     # Get your own user ID
     me = await client.get_me()
 
-    # Ignore messages that you wrote
-    if user.id == me.id:
+    # Ignore messages that you wrote or from bots
+    if user.id == me.id or user.bot:
         return
 
     if user.last_name:
@@ -60,6 +69,8 @@ async def handle_message(event):
     while message_engine.isSpeaking():
         time.sleep(0.1)
 
+
+
 # Get the 20 most recent dialogs
 dialogs = client.loop.run_until_complete(client.get_dialogs(limit=20))
 
@@ -71,7 +82,18 @@ for i, dialog in enumerate(dialogs):
 selected_dialog = input("Enter the number of the chat to read messages from: ")
 
 # Get the chat entity from the user's selection
-chat = dialogs[int(selected_dialog) - 1].entity
+selected_chat = dialogs[int(selected_dialog) - 1].entity
+
+# Set the selected chat's name depending on whether it's a User or a Chat
+if hasattr(selected_chat, 'title'):
+    selected_chat_name = selected_chat.title
+elif hasattr(selected_chat, 'first_name'):
+    selected_chat_name = selected_chat.first_name
+    if selected_chat.last_name:
+        selected_chat_name += f" {selected_chat.last_name}"
+else:
+    selected_chat_name = None
+
 
 # Start the event loop to listen for new messages in the selected chat
 client.run_until_disconnected()
