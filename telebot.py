@@ -1,9 +1,11 @@
-from telethon import TelegramClient, events
-import re
-import pyttsx3
 import AppKit
+import emoji
+import pyttsx3
+import re
+import sys
 import time
 from queue import Queue
+from telethon import TelegramClient, events
 
 # Replace the values below with your own API ID, API hash, and phone number
 api_id = 'YOUR_API_ID'
@@ -23,6 +25,14 @@ message_engine = AppKit.NSSpeechSynthesizer.alloc().initWithVoice_(AppKit.NSSpee
 # Set the speaking rate of the speech synthesizer
 message_engine.setRate_(speaking_rate)
 
+# Define a regular expression pattern that matches all emoji characters
+emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags=re.UNICODE)
+
 # Define an asynchronous message handler function
 @client.on(events.NewMessage)
 async def handle_message(event):
@@ -39,6 +49,9 @@ async def handle_message(event):
     if not event.message.text or event.message.sticker or event.message.media or re.search("(?P<url>https?://[^\s]+)", event.message.text):
         return
 
+    # Remove any emojis from the message text
+    message_text = emoji_pattern.sub(r'', event.message.text)
+
     user = await event.client.get_entity(event.message.from_id)
 
     # Get your own user ID
@@ -53,10 +66,10 @@ async def handle_message(event):
     else:
         name = f"{user.first_name}"
 
-    print(name + ": " + event.message.text)
+    print(name + ": " + message_text)
 
     # Check if the message contains Cyrillic symbols
-    if re.search('[а-яА-Я]', event.message.text):
+    if re.search('[а-яА-Я]', message_text):
         # If the message contains Cyrillic symbols, set the voice to a Russian voice identifier string
         voice_id = 'com.apple.speech.synthesis.voice.milena'
         message_engine.setVoice_(voice_id)
@@ -65,11 +78,9 @@ async def handle_message(event):
         message_engine.setVoice_(AppKit.NSSpeechSynthesizer.defaultVoice())
 
     # Speak the author's name and the message text using the same NSSpeechSynthesizer instance
-    message_engine.startSpeakingString_(name + " says: " + event.message.text)
+    message_engine.startSpeakingString_(name + " says: " + message_text)
     while message_engine.isSpeaking():
         time.sleep(0.1)
-
-
 
 # Get the 20 most recent dialogs
 dialogs = client.loop.run_until_complete(client.get_dialogs(limit=20))
@@ -92,8 +103,11 @@ elif hasattr(selected_chat, 'first_name'):
     if selected_chat.last_name:
         selected_chat_name += f" {selected_chat.last_name}"
 else:
-    selected_chat_name = None
-
+    selected_chat_name = getattr(selected_chat, 'username', None)
+    if selected_chat_name is None:
+        print("Selected chat is not a User or a Chat object")
+        client.disconnect()
+        sys.exit()
 
 # Start the event loop to listen for new messages in the selected chat
 client.run_until_disconnected()
