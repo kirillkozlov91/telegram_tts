@@ -31,6 +31,8 @@ emoji_pattern = re.compile("["
         u"\U0001F300-\U0001F5FF"  # symbols & pictographs
         u"\U0001F680-\U0001F6FF"  # transport & map symbols
         u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002702-\U000027B0"  # dingbats
+        u"\U000024C2-\U0001F251"
                            "]+", flags=re.UNICODE)
 
 # Define an asynchronous message handler function
@@ -51,6 +53,9 @@ async def handle_message(event):
 
     # Remove any emojis from the message text
     message_text = emoji_pattern.sub(r'', event.message.text)
+    # If the message text is empty after removing emojis, ignore the message
+    if not message_text:
+        return
 
     user = await event.client.get_entity(event.message.from_id)
 
